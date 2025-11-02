@@ -1,0 +1,22 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-vscode.extension-test-runner",
+    "ms-vscode-remote.remote-wsl",
+    "ms-vscode-remote.remote-ssh",
+    "ms-azuretools.vscode-docker",
+    "vs-code-red.red",
+    "tamasfe.even-better-toml",
+    "redhat.vscode-yaml",
+    "eamodio.gitlens",
+    "ms-vscode.remote-explorer",
+    "humao.rest-client",
+    "ms-vscode.vscode-node-debug2",
+    "chrisdias.vscode-opennewinstance",
+    "yzhang.markdown-all-in-one",
+    "mhutchie.git-graph",
+    "foxundermoon.shell-format",
+    "oderwat.indent-rainbow"
+  ]
+}
