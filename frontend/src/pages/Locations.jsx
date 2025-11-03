@@ -41,28 +41,29 @@ const Locations = () => {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const token = localStorage.getItem('token');
-      await locationsAPI.create(formData, token);
-      setFormData({
-        name: '',
-        address: '',
-        city: '',
-        state: '',
-        zip: '',
-        phone: '',
-        email: ''
-      });
-      setShowForm(false);
-      fetchLocations();
-      alert('Location created successfully!');
-    } catch (err) {
-      console.error('Error:', err);
-      alert('Error creating location');
-    }
-  };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const token = localStorage.getItem('token');
+    const response = await locationsAPI.create(formData, token);
+    console.log('✅ Success:', response);
+    setFormData({
+      name: '',
+      address: '',
+      city: '',
+      state: '',
+      zip: '',
+      phone: '',
+      email: ''
+    });
+    setShowForm(false);
+    fetchLocations();
+    alert('Location created successfully!');
+  } catch (err) {
+    console.error('❌ Error:', err);
+    alert(`Error creating location: ${err.message}`);
+  }
+};
 
   return (
     <div className="page-container">

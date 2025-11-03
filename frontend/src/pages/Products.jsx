@@ -43,30 +43,31 @@ const Products = () => {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const token = localStorage.getItem('token');
-      await productsAPI.create(formData, token);
-      setFormData({
-        sku: '',
-        name: '',
-        description: '',
-        category: '',
-        cost: '',
-        price: '',
-        barcode: '',
-        reorder_point: '10',
-        reorder_quantity: '50'
-      });
-      setShowForm(false);
-      fetchProducts();
-      alert('Product created successfully!');
-    } catch (err) {
-      console.error('Error:', err);
-      alert('Error creating product');
-    }
-  };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const token = localStorage.getItem('token');
+    const response = await productsAPI.create(formData, token);
+    console.log('✅ Success:', response);
+    setFormData({
+      sku: '',
+      name: '',
+      description: '',
+      category: '',
+      cost: '',
+      price: '',
+      barcode: '',
+      reorder_point: '10',
+      reorder_quantity: '50'
+    });
+    setShowForm(false);
+    fetchProducts();
+    alert('Product created successfully!');
+  } catch (err) {
+    console.error('❌ Error:', err);
+    alert(`Error creating product: ${err.message}`);
+  }
+};
 
   return (
     <div className="page-container">

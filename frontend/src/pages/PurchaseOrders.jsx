@@ -38,24 +38,27 @@ const PurchaseOrders = () => {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await poAPI.create(formData);
-      setFormData({
-        po_number: '',
-        supplier_id: '',
-        location_id: '',
-        expected_date: '',
-        notes: ''
-      });
-      setShowForm(false);
-      fetchOrders();
-      alert('Purchase order created successfully!');
-    } catch (err) {
-      alert('Error creating purchase order');
-    }
-  };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const token = localStorage.getItem('token');
+    const response = await poAPI.create(formData, token);
+    console.log('✅ Success:', response);
+    setFormData({
+      po_number: '',
+      supplier_id: '',
+      location_id: '',
+      expected_date: '',
+      notes: ''
+    });
+    setShowForm(false);
+    fetchOrders();
+    alert('Purchase order created successfully!');
+  } catch (err) {
+    console.error('❌ Error:', err);
+    alert(`Error creating purchase order: ${err.message}`);
+  }
+};
 
   const getStatusColor = (status) => {
     const colors = {
