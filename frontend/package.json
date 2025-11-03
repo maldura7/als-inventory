@@ -2,7 +2,7 @@
   "name": "als-inventory-frontend",
   "version": "1.0.0",
   "description": "Al's Inventory - Retail Inventory Management System",
-  "homepage": "http://localhost:3000",
+  "homepage": ".",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
