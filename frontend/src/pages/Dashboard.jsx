@@ -1,4 +1,4 @@
-///import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 
@@ -14,19 +14,16 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  fetchData();
-}, [fetchData]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
       const headers = { 'Authorization': `Bearer ${token}` };
 
       // Fetch user's location name
       if (user.location_id) {
-        const locResponse = await fetch(`http://localhost:5000/api/locations/${user.location_id}`, { headers });
+        const locResponse = await fetch(`${apiUrl}/locations/${user.location_id}`, { headers });
         const locData = await locResponse.json();
         if (locData.data) {
           setLocationName(locData.data.name);
@@ -34,24 +31,24 @@ useEffect(() => {
       }
 
       // Fetch products count
-      const productsResponse = await fetch('http://localhost:5000/api/products', { headers });
+      const productsResponse = await fetch(`${apiUrl}/products`, { headers });
       const productsData = await productsResponse.json();
       const productsCount = productsData.data ? productsData.data.length : 0;
 
       // Fetch inventory count
-      const inventoryResponse = await fetch('http://localhost:5000/api/inventory', { headers });
+      const inventoryResponse = await fetch(`${apiUrl}/inventory`, { headers });
       const inventoryData = await inventoryResponse.json();
       const totalInventory = inventoryData.data 
         ? inventoryData.data.reduce((sum, item) => sum + item.quantity, 0) 
         : 0;
 
       // Fetch locations
-      const locationsResponse = await fetch('http://localhost:5000/api/locations', { headers });
+      const locationsResponse = await fetch(`${apiUrl}/locations`, { headers });
       const locationsData = await locationsResponse.json();
       const locationsCount = locationsData.data ? locationsData.data.length : 0;
 
       // Fetch purchase orders
-      const poResponse = await fetch('http://localhost:5000/api/purchase-orders', { headers });
+      const poResponse = await fetch(`${apiUrl}/purchase-orders`, { headers });
       const poData = await poResponse.json();
       const poCount = poData.data ? poData.data.length : 0;
 
@@ -66,7 +63,11 @@ useEffect(() => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user.location_id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');

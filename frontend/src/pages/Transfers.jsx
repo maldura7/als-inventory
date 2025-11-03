@@ -21,9 +21,10 @@ const Transfers = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      const token = localStorage.getItem('token');
       const [transData, locData] = await Promise.all([
-        transfersAPI.getAll(),
-        locationsAPI.getAll()
+        transfersAPI.getAll(token),
+        locationsAPI.getAll(token)
       ]);
       setTransfers(transData.data || []);
       setLocations(locData.data || []);
@@ -45,7 +46,8 @@ const Transfers = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await transfersAPI.create(formData);
+      const token = localStorage.getItem('token');
+      await transfersAPI.create(formData, token);
       setFormData({
         from_location_id: '',
         to_location_id: '',
@@ -56,6 +58,7 @@ const Transfers = () => {
       fetchData();
       alert('Transfer created successfully!');
     } catch (err) {
+      console.error('Error:', err);
       alert('Error creating transfer');
     }
   };

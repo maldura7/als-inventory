@@ -25,7 +25,8 @@ const Products = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const data = await productsAPI.getAll();
+      const token = localStorage.getItem('token');
+      const data = await productsAPI.getAll(token);
       setProducts(data.data || []);
     } catch (err) {
       console.error('Error fetching products:', err);
@@ -45,7 +46,8 @@ const Products = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await productsAPI.create(formData);
+      const token = localStorage.getItem('token');
+      await productsAPI.create(formData, token);
       setFormData({
         sku: '',
         name: '',
@@ -61,6 +63,7 @@ const Products = () => {
       fetchProducts();
       alert('Product created successfully!');
     } catch (err) {
+      console.error('Error:', err);
       alert('Error creating product');
     }
   };

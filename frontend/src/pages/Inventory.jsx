@@ -21,10 +21,11 @@ const Inventory = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      const token = localStorage.getItem('token');
       const [invData, prodData, locData] = await Promise.all([
-        inventoryAPI.getAll(),
-        productsAPI.getAll(),
-        locationsAPI.getAll()
+        inventoryAPI.getAll(token),
+        productsAPI.getAll(token),
+        locationsAPI.getAll(token)
       ]);
       setInventory(invData.data || []);
       setProducts(prodData.data || []);
@@ -47,7 +48,8 @@ const Inventory = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await inventoryAPI.adjust(formData);
+      const token = localStorage.getItem('token');
+      await inventoryAPI.adjust(formData, token);
       setFormData({
         product_id: '',
         location_id: '',
@@ -57,6 +59,7 @@ const Inventory = () => {
       fetchData();
       alert('Inventory adjusted successfully!');
     } catch (err) {
+      console.error('Error:', err);
       alert('Error adjusting inventory');
     }
   };

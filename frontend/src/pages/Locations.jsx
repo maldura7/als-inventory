@@ -23,7 +23,8 @@ const Locations = () => {
   const fetchLocations = async () => {
     try {
       setLoading(true);
-      const data = await locationsAPI.getAll();
+      const token = localStorage.getItem('token');
+      const data = await locationsAPI.getAll(token);
       setLocations(data.data || []);
     } catch (err) {
       console.error('Error fetching locations:', err);
@@ -43,7 +44,8 @@ const Locations = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await locationsAPI.create(formData);
+      const token = localStorage.getItem('token');
+      await locationsAPI.create(formData, token);
       setFormData({
         name: '',
         address: '',
@@ -57,6 +59,7 @@ const Locations = () => {
       fetchLocations();
       alert('Location created successfully!');
     } catch (err) {
+      console.error('Error:', err);
       alert('Error creating location');
     }
   };
@@ -64,7 +67,7 @@ const Locations = () => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1>📍 Store Locations</h1>
+        <h1>🏬 Store Locations</h1>
         <button 
           onClick={() => setShowForm(!showForm)}
           className="btn btn-primary"

@@ -1,51 +1,21 @@
-const API_URL = 'http://localhost:5000/api/auth';
+const API_URL = '/api';
 
-const getToken = () => localStorage.getItem('token');
-
-const headers = () => ({
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${getToken()}`
-});
+// Generic API helper
+const apiCall = async (method, endpoint, data = null, token = null) => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  
+  const options = { method, headers };
+  if (data) options.body = JSON.stringify(data);
+  
+  const response = await fetch(`${API_URL}${endpoint}`, options);
+  return response.json();
+};
 
 export const usersAPI = {
-  // Get all users (admin only)
-  getAllUsers: async () => {
-    const response = await fetch(`${API_URL}/users/all`, { headers: headers() });
-    return response.json();
-  },
-
-  // Get users for specific location
-  getUsersByLocation: async (locationId) => {
-    const response = await fetch(`${API_URL}/users/location/${locationId}`, { headers: headers() });
-    return response.json();
-  },
-
-  // Create new user
-  createUser: async (data) => {
-    const response = await fetch(`${API_URL}/users/create`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(data)
-    });
-    return response.json();
-  },
-
-  // Update user
-  updateUser: async (id, data) => {
-    const response = await fetch(`${API_URL}/users/${id}`, {
-      method: 'PUT',
-      headers: headers(),
-      body: JSON.stringify(data)
-    });
-    return response.json();
-  },
-
-  // Delete user
-  deleteUser: async (id) => {
-    const response = await fetch(`${API_URL}/users/${id}`, {
-      method: 'DELETE',
-      headers: headers()
-    });
-    return response.json();
-  }
+  getAllUsers: (token) => apiCall('GET', '/users', null, token),
+  getUsersByLocation: (locationId, token) => apiCall('GET', `/users/location/${locationId}`, null, token),
+  createUser: (data, token) => apiCall('POST', '/users/create', data, token),
+  updateUser: (id, data, token) => apiCall('PUT', `/users/${id}`, data, token),
+  deleteUser: (id, token) => apiCall('DELETE', `/users/${id}`, null, token),
 };

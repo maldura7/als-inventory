@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { usersAPI } from '../services/userService';
 import { locationsAPI } from '../services/api';
 import '../styles/Table.css';
@@ -19,26 +19,23 @@ const Users = () => {
     location_id: ''
   });
 
-useEffect(() => {
-  fetchData();
-}, [fetchData]);  // ✅ Add fetchData
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      const token = localStorage.getItem('token');
       
       // Only admins can view all users
       if (currentUser.role === 'admin') {
         const [usersData, locationsData] = await Promise.all([
-          usersAPI.getAllUsers(),
-          locationsAPI.getAll()
+          usersAPI.getAllUsers(token),
+          locationsAPI.getAll(token)
         ]);
         setUsers(usersData.data || []);
         setLocations(locationsData.data || []);
       } else {
         // Non-admins can only view users in their location
-        const usersData = await usersAPI.getUsersByLocation(currentUser.location_id);
-        const locationsData = await locationsAPI.getAll();
+        const usersData = await usersAPI.getUsersByLocation(currentUser.location_id, token);
+        const locationsData = await locationsAPI.getAll(token);
         setUsers(usersData.data || []);
         setLocations(locationsData.data || []);
       }
@@ -48,7 +45,11 @@ useEffect(() => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser.role, currentUser.location_id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -60,6 +61,7 @@ useEffect(() => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const token = localStorage.getItem('token');
     
     try {
       if (editingId) {
@@ -70,7 +72,7 @@ useEffect(() => {
           location_id: formData.location_id,
           is_active: 1
         };
-        await usersAPI.updateUser(editingId, updateData);
+        await usersAPI.updateUser(editingId, updateData, token);
         alert('User updated successfully!');
       } else {
         // Create new user
@@ -78,7 +80,7 @@ useEffect(() => {
           alert('Password is required for new users');
           return;
         }
-        await usersAPI.createUser(formData);
+        await usersAPI.createUser(formData, token);
         alert('User created successfully!');
       }
       
@@ -117,7 +119,8 @@ useEffect(() => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        await usersAPI.deleteUser(id);
+        const token = localStorage.getItem('token');
+        await usersAPI.deleteUser(id, token);
         alert('User deleted successfully!');
         fetchData();
       } catch (err) {
