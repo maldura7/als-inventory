@@ -1,8 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { productsAPI, locationsAPI, inventoryAPI } from '../services/api';
 import '../styles/Table.css';
 
 const Reports = () => {
-  const [reportType, setReportType] = useState('inventory');
+  const [reportType, setReportType] = useState('summary');
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    totalLocations: 0,
+    totalValue: 0,
+    lowStockItems: 0,
+    inventory: []
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+
+      const [productsData, locationsData, inventoryData] = await Promise.all([
+        productsAPI.getAll(token),
+        locationsAPI.getAll(token),
+        inventoryAPI.getAll(token)
+      ]);
+
+      const products = productsData.data || [];
+      const locations = locationsData.data || [];
+      const inventory = inventoryData.data || [];
+
+      // Calculate stats
+      const totalProducts = products.length;
+      const totalLocations = locations.length;
+      const totalValue = products.reduce((sum, p) => sum + ((p.price || 0) * getProductInventory(p.id, inventory)), 0);
+      const lowStockItems = products.filter(p => {
+        const invItem = inventory.find(i => i.product_id === p.id);
+        return invItem && invItem.quantity < (p.reorder_point || 10);
+      }).length;
+
+      setStats({
+        totalProducts,
+        totalLocations,
+        totalValue,
+        lowStockItems,
+        inventory
+      });
+    } catch (err) {
+      console.error('Error fetching report data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getProductInventory = (productId, inventory) => {
+    return inventory
+      .filter(i => i.product_id === productId)
+      .reduce((sum, i) => sum + (i.quantity || 0), 0);
+  };
 
   return (
     <div className="page-container">
@@ -18,12 +75,6 @@ const Reports = () => {
           📦 Inventory Report
         </button>
         <button 
-          onClick={() => setReportType('sales')}
-          className={`report-btn ${reportType === 'sales' ? 'active' : ''}`}
-        >
-          💰 Sales Report
-        </button>
-        <button 
           onClick={() => setReportType('summary')}
           className={`report-btn ${reportType === 'summary' ? 'active' : ''}`}
         >
@@ -36,17 +87,36 @@ const Reports = () => {
           <h3>📦 Inventory Report</h3>
           <p>View current stock levels across all locations</p>
           <div className="report-placeholder">
-            <p>Loading inventory data...</p>
-          </div>
-        </div>
-      )}
-
-      {reportType === 'sales' && (
-        <div className="report-content">
-          <h3>💰 Sales Report</h3>
-          <p>View sales analytics and trends</p>
-          <div className="report-placeholder">
-            <p>Loading sales data...</p>
+            {loading ? (
+              <p>Loading inventory data...</p>
+            ) : stats.inventory.length === 0 ? (
+              <p>No inventory data available</p>
+            ) : (
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Location</th>
+                      <th>Product</th>
+                      <th>Quantity</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.inventory.map(item => (
+                      <tr key={item.id}>
+                        <td>{item.location_id}</td>
+                        <td>{item.product_id}</td>
+                        <td>{item.quantity}</td>
+                        <td>
+                          {item.quantity > 20 ? '✅ Good' : item.quantity > 10 ? '⚠️ Medium' : '🔴 Low'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -58,19 +128,19 @@ const Reports = () => {
           <div className="stats-container">
             <div className="stat-box">
               <h4>Total Products</h4>
-              <p className="stat-number">0</p>
+              <p className="stat-number">{loading ? '-' : stats.totalProducts}</p>
             </div>
             <div className="stat-box">
               <h4>Total Locations</h4>
-              <p className="stat-number">0</p>
+              <p className="stat-number">{loading ? '-' : stats.totalLocations}</p>
             </div>
             <div className="stat-box">
               <h4>Total Inventory Value</h4>
-              <p className="stat-number">$0.00</p>
+              <p className="stat-number">${loading ? '0.00' : stats.totalValue.toFixed(2)}</p>
             </div>
             <div className="stat-box">
               <h4>Low Stock Items</h4>
-              <p className="stat-number">0</p>
+              <p className="stat-number">{loading ? '-' : stats.lowStockItems}</p>
             </div>
           </div>
         </div>

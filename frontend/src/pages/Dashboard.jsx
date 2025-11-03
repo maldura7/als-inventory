@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { productsAPI, inventoryAPI, locationsAPI, poAPI } from '../services/api';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -18,38 +19,35 @@ const Dashboard = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-      const headers = { 'Authorization': `Bearer ${token}` };
 
       // Fetch user's location name
       if (user.location_id) {
-        const locResponse = await fetch(`${apiUrl}/locations/${user.location_id}`, { headers });
-        const locData = await locResponse.json();
-        if (locData.data) {
-          setLocationName(locData.data.name);
+        try {
+          const locResponse = await fetch(`/api/locations/${user.location_id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const locData = await locResponse.json();
+          if (locData.data) {
+            setLocationName(locData.data.name);
+          }
+        } catch (err) {
+          console.error('Error fetching location:', err);
         }
       }
 
-      // Fetch products count
-      const productsResponse = await fetch(`${apiUrl}/products`, { headers });
-      const productsData = await productsResponse.json();
+      // Fetch all data in parallel
+      const [productsData, inventoryData, locationsData, poData] = await Promise.all([
+        productsAPI.getAll(token),
+        inventoryAPI.getAll(token),
+        locationsAPI.getAll(token),
+        poAPI.getAll(token)
+      ]);
+
       const productsCount = productsData.data ? productsData.data.length : 0;
-
-      // Fetch inventory count
-      const inventoryResponse = await fetch(`${apiUrl}/inventory`, { headers });
-      const inventoryData = await inventoryResponse.json();
       const totalInventory = inventoryData.data 
-        ? inventoryData.data.reduce((sum, item) => sum + item.quantity, 0) 
+        ? inventoryData.data.reduce((sum, item) => sum + (item.quantity || 0), 0) 
         : 0;
-
-      // Fetch locations
-      const locationsResponse = await fetch(`${apiUrl}/locations`, { headers });
-      const locationsData = await locationsResponse.json();
       const locationsCount = locationsData.data ? locationsData.data.length : 0;
-
-      // Fetch purchase orders
-      const poResponse = await fetch(`${apiUrl}/purchase-orders`, { headers });
-      const poData = await poResponse.json();
       const poCount = poData.data ? poData.data.length : 0;
 
       setStats({
@@ -102,7 +100,7 @@ const Dashboard = () => {
             <a href="/inventory">📈 Inventory</a>
           </li>
           <li className="menu-item">
-            <a href="/locations">📍 Locations</a>
+            <a href="/locations">🏬 Locations</a>
           </li>
           <li className="menu-item">
             <a href="/purchase-orders">🛒 Purchase Orders</a>
@@ -122,7 +120,7 @@ const Dashboard = () => {
       <main className="main-content">
         <div className="welcome-section">
           <h2>Welcome, {user.full_name}!</h2>
-          <p>📍 Store: <strong>{locationName}</strong></p>
+          <p>🏪 Store: <strong>{locationName}</strong></p>
           <p>Al's Inventory Management System</p>
         </div>
 
@@ -145,9 +143,9 @@ const Dashboard = () => {
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon">📍</div>
+            <div className="stat-icon">🏬</div>
             <div className="stat-info">
-              <h3>Your Location</h3>
+              <h3>Locations</h3>
               <p className="stat-value">{loading ? '-' : stats.locations}</p>
             </div>
           </div>
@@ -168,7 +166,7 @@ const Dashboard = () => {
           <ul>
             <li><strong>📦 Products:</strong> Create and manage your product catalog with SKU, pricing, and categories</li>
             <li><strong>📈 Inventory:</strong> Track and adjust stock levels for this location</li>
-            <li><strong>📍 Locations:</strong> View and manage store location details</li>
+            <li><strong>🏬 Locations:</strong> View and manage store location details</li>
             <li><strong>🛒 Purchase Orders:</strong> Create and track orders from suppliers</li>
             <li><strong>🚚 Transfers:</strong> Transfer stock between locations</li>
             <li><strong>📋 Reports:</strong> View detailed analytics and business reports</li>
