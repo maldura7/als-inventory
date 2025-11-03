@@ -1,5 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+// Initialize database if it doesn't exist
+const fs = require('fs');
+const path = require('path');
+const dbPath = path.join(__dirname, 'database', 'inventory.db');
+
+if (!fs.existsSync(dbPath)) {
+  console.log('Initializing database...');
+  require('./database/init-database.js');
+}
 require('dotenv').config();
 const { initializeDatabase } = require('./database/init-database');
 
