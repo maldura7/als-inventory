@@ -1,15 +1,34 @@
 const API_URL = '/api';
 
-// Generic API helper
+// Generic API helper with better error handling
 const apiCall = async (method, endpoint, data = null, token = null) => {
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  
+  // ALWAYS get fresh token from localStorage
+  const authToken = token || localStorage.getItem('token');
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+    console.log('🔐 Auth token attached:', authToken.substring(0, 20) + '...');
+  } else {
+    console.warn('⚠️ No token found in localStorage');
+  }
   
   const options = { method, headers };
   if (data) options.body = JSON.stringify(data);
   
+  console.log(`📤 ${method} ${API_URL}${endpoint}`, { headers, data });
+  
   const response = await fetch(`${API_URL}${endpoint}`, options);
-  return response.json();
+  const responseData = await response.json();
+  
+  console.log(`📥 Response:`, { status: response.status, data: responseData });
+  
+  if (!response.ok) {
+    console.error('❌ API Error:', responseData);
+    throw new Error(responseData.message || 'API request failed');
+  }
+  
+  return responseData;
 };
 
 // Export generic API
