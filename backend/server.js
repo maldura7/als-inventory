@@ -27,7 +27,18 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// Serve static files from frontend build
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve React app for all non-API routes (SPA routing)
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    next(); // Let API routes pass through
+  } else {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
+});
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
