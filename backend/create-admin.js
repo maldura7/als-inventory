@@ -1,17 +1,18 @@
 // Initialize database if needed
 const fs = require('fs');
-const dbPath = require('path').join(__dirname, 'database', 'inventory.db');
+const path = require('path');
+const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
 
+const dbPath = path.join(__dirname, 'database', 'inventory.db');
+
+// Initialize database if it doesn't exist
 if (!fs.existsSync(dbPath)) {
   console.log('Initializing database first...');
   require('./database/init-database.js');
 }
-const Database = require('better-sqlite3');
-const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
-const path = require('path');
 
-const dbPath = path.join(__dirname, 'database', 'inventory.db');
 const db = new Database(dbPath);
 
 try {

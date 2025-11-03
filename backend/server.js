@@ -1,24 +1,17 @@
 const express = require('express');
 const cors = require('cors');
-// Initialize database if it doesn't exist
 const fs = require('fs');
 const path = require('path');
+
+require('dotenv').config();
+
+// Initialize database if it doesn't exist
 const dbPath = path.join(__dirname, 'database', 'inventory.db');
 
 if (!fs.existsSync(dbPath)) {
   console.log('Initializing database...');
   require('./database/init-database.js');
-}
-require('dotenv').config();
-const { initializeDatabase } = require('./database/init-database');
-
-// Initialize database
-try {
-  initializeDatabase();
-  console.log('✅ Database ready');
-} catch (err) {
-  console.error('Database initialization failed:', err);
-  process.exit(1);
+  console.log('✅ Database initialized');
 }
 
 const app = express();
