@@ -14,6 +14,40 @@ if (!fs.existsSync(dbPath)) {
   console.log('✅ Database initialized');
 }
 
+// Seed admin account if it doesn't exist
+const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
+
+try {
+  const db = new Database(dbPath);
+  const adminExists = db.prepare('SELECT id FROM users WHERE role = ?').get('admin');
+  
+  if (!adminExists) {
+    console.log('Creating admin account...');
+    const userId = uuidv4();
+    const hashedPassword = bcrypt.hashSync('Admin123456', 10);
+    
+    db.prepare(`
+      INSERT INTO users (id, email, password, full_name, role, is_active, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      userId,
+      'admin@example.com',
+      hashedPassword,
+      'Administrator',
+      'admin',
+      1,
+      new Date().toISOString()
+    );
+    
+    console.log('✅ Admin account created');
+  }
+  db.close();
+} catch (err) {
+  console.error('Admin seeding error:', err);
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -27,6 +61,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 // Serve static files from frontend build
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -38,6 +73,7 @@ app.get('*', (req, res, next) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   }
 });
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
