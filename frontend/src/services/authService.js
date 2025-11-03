@@ -1,13 +1,26 @@
-import api from './api';
+import { api } from './api';
 
-const authService = {
+export const authService = {
   login: async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      
+      if (data.data && data.data.token) {
+        localStorage.setItem('token', data.data.token);
+        localStorage.setItem('user', JSON.stringify(data.data.user));
+      }
+      return data;
+    } catch (err) {
+      console.error('Login error:', err);
+      throw err;
     }
-    return response.data;
   },
 
   logout: () => {
@@ -20,45 +33,7 @@ const authService = {
     return user ? JSON.parse(user) : null;
   },
 
-  getMe: async () => {
-    const response = await api.get('/auth/me');
-    return response.data;
+  getToken: () => {
+    return localStorage.getItem('token');
   },
-
-  changePassword: async (currentPassword, newPassword, confirmPassword) => {
-    const response = await api.put('/auth/change-password', {
-      current_password: currentPassword,
-      new_password: newPassword,
-      confirm_password: confirmPassword
-    });
-    return response.data;
-  },
-
-  getUsers: async (page = 1, limit = 20) => {
-    const response = await api.get('/auth/users', {
-      params: { page, limit }
-    });
-    return response.data;
-  },
-
-  updateUser: async (userId, userData) => {
-    const response = await api.put(`/auth/users/${userId}`, userData);
-    return response.data;
-  },
-
-  isAuthenticated: () => {
-    return !!localStorage.getItem('token');
-  },
-
-  isAdmin: () => {
-    const user = authService.getCurrentUser();
-    return user?.role === 'admin';
-  },
-
-  isManagerOrAdmin: () => {
-    const user = authService.getCurrentUser();
-    return ['admin', 'manager'].includes(user?.role);
-  }
 };
-
-export default authService;

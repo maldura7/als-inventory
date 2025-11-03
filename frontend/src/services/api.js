@@ -1,123 +1,46 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = '/api';
 
-const getToken = () => localStorage.getItem('token');
-
-const headers = () => ({
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${getToken()}`
-});
-
-// Products API
-export const productsAPI = {
-  getAll: async () => {
-    const response = await fetch(`${API_URL}/products`, { headers: headers() });
+export const api = {
+  get: async (endpoint, token = null) => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_URL}${endpoint}`, { headers });
     return response.json();
   },
-  create: async (data) => {
-    const response = await fetch(`${API_URL}/products`, {
+
+  post: async (endpoint, data, token = null) => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_URL}${endpoint}`, {
       method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(data)
+      headers,
+      body: JSON.stringify(data),
     });
     return response.json();
   },
-  update: async (id, data) => {
-    const response = await fetch(`${API_URL}/products/${id}`, {
+
+  put: async (endpoint, data, token = null) => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_URL}${endpoint}`, {
       method: 'PUT',
-      headers: headers(),
-      body: JSON.stringify(data)
+      headers,
+      body: JSON.stringify(data),
     });
     return response.json();
   },
-  delete: async (id) => {
-    const response = await fetch(`${API_URL}/products/${id}`, {
+
+  delete: async (endpoint, token = null) => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    
+    const response = await fetch(`${API_URL}${endpoint}`, {
       method: 'DELETE',
-      headers: headers()
-    });
-    return response.json();
-  }
-};
-
-// Inventory API
-export const inventoryAPI = {
-  getAll: async () => {
-    const response = await fetch(`${API_URL}/inventory`, { headers: headers() });
-    return response.json();
-  },
-  adjust: async (data) => {
-    const response = await fetch(`${API_URL}/inventory/adjust`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(data)
-    });
-    return response.json();
-  }
-};
-
-// Locations API
-export const locationsAPI = {
-  getAll: async () => {
-    const response = await fetch(`${API_URL}/locations`, { headers: headers() });
-    return response.json();
-  },
-  create: async (data) => {
-    const response = await fetch(`${API_URL}/locations`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(data)
+      headers,
     });
     return response.json();
   },
-  update: async (id, data) => {
-    const response = await fetch(`${API_URL}/locations/${id}`, {
-      method: 'PUT',
-      headers: headers(),
-      body: JSON.stringify(data)
-    });
-    return response.json();
-  }
-};
-
-// Purchase Orders API
-export const poAPI = {
-  getAll: async () => {
-    const response = await fetch(`${API_URL}/purchase-orders`, { headers: headers() });
-    return response.json();
-  },
-  create: async (data) => {
-    const response = await fetch(`${API_URL}/purchase-orders`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(data)
-    });
-    return response.json();
-  }
-};
-
-// Transfers API
-export const transfersAPI = {
-  getAll: async () => {
-    const response = await fetch(`${API_URL}/transfers`, { headers: headers() });
-    return response.json();
-  },
-  create: async (data) => {
-    const response = await fetch(`${API_URL}/transfers`, {
-      method: 'POST',
-      headers: headers(),
-      body: JSON.stringify(data)
-    });
-    return response.json();
-  }
-};
-
-// Reports API
-export const reportsAPI = {
-  getInventoryReport: async () => {
-    const response = await fetch(`${API_URL}/reports/inventory`, { headers: headers() });
-    return response.json();
-  },
-  getSalesReport: async () => {
-    const response = await fetch(`${API_URL}/reports/sales`, { headers: headers() });
-    return response.json();
-  }
 };
