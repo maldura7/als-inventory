@@ -34,8 +34,8 @@
       "last 1 safari version"
     ]
   },
-  "engines": {
-    "node": "22.x",
-    "npm": "10.x"
-  }
+"engines": {
+  "node": "20.x",
+  "npm": "10.x"
+}
 }
