@@ -61,18 +61,21 @@ router.post('/login', (req, res) => {
     const updateStmt = db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?');
     updateStmt.run(user.id);
 
-    // Return success response
-    return res.json({
-      success: true,
-      message: 'Login successful',
-      token: token,
-      user: {
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name,
-        role: user.role
-      }
-    });
+// Return success response
+return res.json({
+  success: true,
+  message: 'Login successful',
+  data: {
+    token: token,
+    user: {
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+      role: user.role,
+      location_id: user.location_id
+    }
+  }
+});
 
   } catch (err) {
     console.error('Login error:', err);

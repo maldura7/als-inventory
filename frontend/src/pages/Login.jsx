@@ -10,36 +10,35 @@ const Login = () => {
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  e.preventDefault();
+  setError('');
+  setLoading(true);
 
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (response.ok && data.data) {
-        localStorage.setItem('token', data.data.token);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-        navigate('/dashboard');
-      } else {
-        setError(data.message || 'Login failed');
-      }
-    } catch (err) {
-      console.error('Login error:', err);
-      setError('Connection error. Make sure backend is running.');
-    } finally {
-      setLoading(false);
+    if (response.ok && data.data && data.data.token) {
+      localStorage.setItem('token', data.data.token);
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+      navigate('/dashboard');
+    } else {
+      setError(data.message || 'Login failed');
     }
-  };
-
+  } catch (err) {
+    console.error('Login error:', err);
+    setError('Connection error. Make sure backend is running.');
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="login-container">
       <div className="login-box">
