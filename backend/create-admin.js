@@ -1,7 +1,6 @@
 // Initialize database if needed
 const fs = require('fs');
-const path = require('path');
-const dbPath = path.join(__dirname, 'database', 'inventory.db');
+const dbPath = require('path').join(__dirname, 'database', 'inventory.db');
 
 if (!fs.existsSync(dbPath)) {
   console.log('Initializing database first...');
