@@ -10,7 +10,6 @@ class CloverService {
     this.baseUrl = this.environment === 'sandbox' ? this.sandboxUrl : this.productionUrl;
   }
 
-  // Generate OAuth authorization URL
   getAuthorizationUrl(redirectUrl) {
     return `${this.baseUrl}/oauth/authorize?` +
       `client_id=${this.appId}&` +
@@ -18,7 +17,6 @@ class CloverService {
       `response_type=code`;
   }
 
-  // Exchange authorization code for access token
   async getAccessToken(code, redirectUrl) {
     try {
       const response = await axios.post(
@@ -44,7 +42,6 @@ class CloverService {
     }
   }
 
-  // Get merchant info
   async getMerchantInfo(accessToken, merchantId) {
     try {
       const response = await axios.get(
@@ -62,7 +59,6 @@ class CloverService {
     }
   }
 
-  // Get inventory items from Clover
   async getInventoryItems(accessToken, merchantId, params = {}) {
     try {
       const response = await axios.get(
@@ -85,7 +81,6 @@ class CloverService {
     }
   }
 
-  // Get single item from Clover
   async getItem(accessToken, merchantId, itemId) {
     try {
       const response = await axios.get(
@@ -103,7 +98,6 @@ class CloverService {
     }
   }
 
-  // Create item in Clover
   async createItem(accessToken, merchantId, itemData) {
     try {
       const response = await axios.post(
@@ -123,7 +117,6 @@ class CloverService {
     }
   }
 
-  // Update item in Clover
   async updateItem(accessToken, merchantId, itemId, itemData) {
     try {
       const response = await axios.post(
@@ -143,25 +136,6 @@ class CloverService {
     }
   }
 
-  // Get item inventory in Clover
-  async getItemInventory(accessToken, merchantId, itemId) {
-    try {
-      const response = await axios.get(
-        `${this.baseUrl}/v3/merchants/${merchantId}/items/${itemId}/inventory`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
-        }
-      );
-      return response.data;
-    } catch (err) {
-      console.error('Get item inventory error:', err);
-      throw new Error('Failed to get item inventory from Clover');
-    }
-  }
-
-  // Update item inventory in Clover
   async updateItemInventory(accessToken, merchantId, itemId, quantity) {
     try {
       const response = await axios.post(
@@ -181,82 +155,23 @@ class CloverService {
     }
   }
 
-  // Get modifiers (for item variants)
-  async getModifiers(accessToken, merchantId, itemId) {
-    try {
-      const response = await axios.get(
-        `${this.baseUrl}/v3/merchants/${merchantId}/items/${itemId}/modifiers`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
-        }
-      );
-      return response.data;
-    } catch (err) {
-      console.error('Get modifiers error:', err);
-      throw new Error('Failed to get modifiers');
-    }
-  }
-
-  // Get categories
-  async getCategories(accessToken, merchantId) {
-    try {
-      const response = await axios.get(
-        `${this.baseUrl}/v3/merchants/${merchantId}/categories`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          },
-          params: {
-            limit: 100
-          }
-        }
-      );
-      return response.data;
-    } catch (err) {
-      console.error('Get categories error:', err);
-      throw new Error('Failed to get categories');
-    }
-  }
-
-  // Get employees (for audit tracking)
-  async getEmployees(accessToken, merchantId) {
-    try {
-      const response = await axios.get(
-        `${this.baseUrl}/v3/merchants/${merchantId}/employees`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
-        }
-      );
-      return response.data;
-    } catch (err) {
-      console.error('Get employees error:', err);
-      throw new Error('Failed to get employees');
-    }
-  }
-
-  // Map local inventory to Clover format
   mapToCloverItem(localProduct) {
     return {
       name: localProduct.name,
       code: localProduct.sku,
       sku: localProduct.sku,
-      price: (localProduct.price * 100), // Clover uses cents
+      price: (localProduct.price * 100),
       cost: (localProduct.cost * 100),
       description: localProduct.description || '',
       notes: localProduct.notes || ''
     };
   }
 
-  // Map Clover item to local format
   mapFromCloverItem(cloverItem) {
     return {
       name: cloverItem.name,
       sku: cloverItem.code || cloverItem.sku,
-      price: (cloverItem.price / 100), // Convert from cents
+      price: (cloverItem.price / 100),
       cost: (cloverItem.cost / 100),
       description: cloverItem.description || '',
       clover_id: cloverItem.id

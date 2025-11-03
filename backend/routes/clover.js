@@ -1,326 +1,308 @@
 const express = require('express');
 const router = express.Router();
-const { v4: uuidv4 } = require('uuid');
-const { db } = require('../database/init-database');
-const { authMiddleware, managerOrAdmin } = require('../middleware/auth');
-const CloverService = require('../services/clover-service');
+const Database = require('better-sqlite3');
+const path = require('path');
+const CloverService = require('../services/cloverService');
+const authMiddleware = require('../middleware/auth');
 
+const dbPath = path.join(__dirname, '../database/inventory.db');
+
+// Initialize Clover service
 const cloverService = new CloverService();
 
-// Store Clover token temporarily (in production, use secure session storage)
-const cloverTokens = {};
-
-// Step 1: Get authorization URL
-router.get('/auth-url', (req, res) => {
+// GET /api/clover/authorize - Start OAuth flow
+router.get('/authorize', (req, res) => {
   try {
-    const redirectUrl = `${process.env.APP_URL || 'http://localhost:5000'}/api/clover/auth-callback`;
-    const authUrl = cloverService.getAuthorizationUrl(redirectUrl);
-
-    res.json({
-      success: true,
-      url: authUrl
-    });
+    const redirectUri = process.env.CLOVER_REDIRECT_URI || 
+      'http://localhost:5000/api/clover/oauth-callback';
+    
+    const authUrl = cloverService.getAuthorizationUrl(redirectUri);
+    console.log('🔗 Redirecting to Clover OAuth:', authUrl);
+    res.redirect(authUrl);
   } catch (err) {
-    console.error('Get auth URL error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to get authorization URL' 
-    });
+    console.error('❌ Authorization error:', err);
+    res.status(500).json({ success: false, message: 'Authorization failed' });
   }
 });
 
-// Step 2: Handle OAuth callback
-router.get('/auth-callback', async (req, res) => {
+// GET /api/clover/oauth-callback - Handle OAuth callback
+router.get('/oauth-callback', async (req, res) => {
   try {
-    const { code, state } = req.query;
+    const { code, error } = req.query;
+
+    if (error) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `OAuth error: ${error}` 
+      });
+    }
 
     if (!code) {
       return res.status(400).json({ 
         success: false, 
-        message: 'No authorization code provided' 
+        message: 'No authorization code received' 
       });
     }
 
-    const redirectUrl = `${process.env.APP_URL || 'http://localhost:5000'}/api/clover/auth-callback`;
-    const tokenData = await cloverService.getAccessToken(code, redirectUrl);
+    const redirectUri = process.env.CLOVER_REDIRECT_URI || 
+      'http://localhost:5000/api/clover/oauth-callback';
 
-    // Store token temporarily (in production, associate with user session)
-    const sessionId = uuidv4();
-    cloverTokens[sessionId] = {
-      accessToken: tokenData.access_token,
-      merchantId: tokenData.merchant_id,
-      createdAt: new Date()
-    };
+    // Exchange code for access token
+    const tokenData = await cloverService.getAccessToken(code, redirectUri);
+    const { access_token, merchant_id } = tokenData;
 
-    // Redirect to frontend with session ID
-    res.redirect(`http://localhost:3000/clover/setup?session=${sessionId}`);
+    // Store Clover connection in database
+    const db = new Database(dbPath);
+    const userId = req.query.user_id;
+
+    if (userId) {
+      db.prepare(`
+        UPDATE users 
+        SET clover_merchant_id = ?, clover_access_token = ?, clover_connected_at = ?
+        WHERE id = ?
+      `).run(merchant_id, access_token, new Date().toISOString(), userId);
+
+      console.log('✅ Clover account connected for user:', userId);
+    }
+
+    db.close();
+
+    // Redirect to frontend with success
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/dashboard?clover=connected`);
+
   } catch (err) {
-    console.error('OAuth callback error:', err);
+    console.error('❌ OAuth callback error:', err);
     res.status(500).json({ 
       success: false, 
-      message: 'Authorization failed' 
+      message: 'Failed to process OAuth callback' 
     });
   }
 });
 
-// Get merchant info
-router.get('/merchant-info', authMiddleware, async (req, res) => {
+// POST /api/clover/connect - Get authorization URL
+router.post('/connect', authMiddleware, (req, res) => {
   try {
-    const { session_id } = req.query;
-
-    if (!session_id || !cloverTokens[session_id]) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid session' 
-      });
-    }
-
-    const token = cloverTokens[session_id];
-    const merchantInfo = await cloverService.getMerchantInfo(token.accessToken, token.merchantId);
+    const userId = req.user.id;
+    const redirectUri = process.env.CLOVER_REDIRECT_URI || 
+      'http://localhost:5000/api/clover/oauth-callback';
+    
+    const authUrl = cloverService.getAuthorizationUrl(redirectUri) + `&user_id=${userId}`;
 
     res.json({
       success: true,
-      merchant: merchantInfo
+      message: 'Authorization URL generated',
+      authUrl: authUrl
     });
+
   } catch (err) {
-    console.error('Get merchant info error:', err);
+    console.error('❌ Connect error:', err);
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to get merchant information' 
+      message: 'Failed to generate authorization URL' 
     });
   }
 });
 
-// Import products from Clover
-router.post('/import-products', authMiddleware, managerOrAdmin, async (req, res) => {
+// GET /api/clover/status - Check connection status
+router.get('/status', authMiddleware, (req, res) => {
   try {
-    const { session_id, location_id } = req.body;
+    const db = new Database(dbPath);
+    const user = db.prepare(
+      'SELECT clover_merchant_id, clover_access_token, clover_connected_at FROM users WHERE id = ?'
+    ).get(req.user.id);
+    db.close();
 
-    if (!session_id || !cloverTokens[session_id]) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid session' 
+    if (user && user.clover_merchant_id && user.clover_access_token) {
+      res.json({
+        success: true,
+        connected: true,
+        merchantId: user.clover_merchant_id,
+        connectedAt: user.clover_connected_at
+      });
+    } else {
+      res.json({
+        success: true,
+        connected: false
       });
     }
-
-    if (!location_id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Location ID is required' 
-      });
-    }
-
-    const token = cloverTokens[session_id];
-    let offset = 0;
-    let allItems = [];
-    let hasMore = true;
-
-    // Paginate through all items
-    while (hasMore) {
-      const itemsData = await cloverService.getInventoryItems(
-        token.accessToken,
-        token.merchantId,
-        { offset, limit: 100 }
-      );
-
-      if (itemsData.elements && itemsData.elements.length > 0) {
-        allItems = allItems.concat(itemsData.elements);
-        offset += itemsData.elements.length;
-      }
-
-      hasMore = itemsData.elements && itemsData.elements.length === 100;
-    }
-
-    // Import products
-    let imported = 0;
-    let skipped = 0;
-
-    allItems.forEach(cloverItem => {
-      try {
-        // Check if product already exists by Clover ID
-        const existing = db.prepare('SELECT id FROM products WHERE clover_id = ?').get(cloverItem.id);
-
-        if (existing) {
-          skipped++;
-          return;
-        }
-
-        const productId = uuidv4();
-        const mappedProduct = cloverService.mapFromCloverItem(cloverItem);
-
-        db.prepare(`
-          INSERT INTO products (id, sku, name, description, price, cost, clover_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          productId,
-          mappedProduct.sku || uuidv4(),
-          mappedProduct.name,
-          mappedProduct.description,
-          mappedProduct.price,
-          mappedProduct.cost || 0,
-          cloverItem.id
-        );
-
-        // Create inventory record for location
-        const inventoryId = uuidv4();
-        const quantity = cloverItem.inventory?.quantity || 0;
-
-        db.prepare(`
-          INSERT INTO inventory (id, product_id, location_id, quantity)
-          VALUES (?, ?, ?, ?)
-        `).run(inventoryId, productId, location_id, quantity);
-
-        imported++;
-      } catch (itemErr) {
-        console.error(`Error importing item ${cloverItem.id}:`, itemErr);
-        skipped++;
-      }
-    });
-
-    // Clean up session
-    delete cloverTokens[session_id];
-
-    res.json({
-      success: true,
-      message: `Import complete: ${imported} imported, ${skipped} skipped`,
-      stats: {
-        imported,
-        skipped,
-        total: allItems.length
-      }
-    });
   } catch (err) {
-    console.error('Import products error:', err);
+    console.error('❌ Status error:', err);
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to import products from Clover' 
+      message: 'Failed to check Clover status' 
     });
   }
 });
 
-// Export inventory to Clover
-router.post('/export-inventory', authMiddleware, managerOrAdmin, async (req, res) => {
+// POST /api/clover/sync-products - Sync products to Clover
+router.post('/sync-products', authMiddleware, async (req, res) => {
   try {
-    const { session_id, location_id } = req.body;
+    const db = new Database(dbPath);
+    const user = db.prepare(
+      'SELECT clover_merchant_id, clover_access_token FROM users WHERE id = ?'
+    ).get(req.user.id);
 
-    if (!session_id || !cloverTokens[session_id]) {
+    if (!user || !user.clover_access_token || !user.clover_merchant_id) {
+      db.close();
       return res.status(400).json({ 
         success: false, 
-        message: 'Invalid session' 
+        message: 'Clover account not connected' 
       });
     }
 
-    if (!location_id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Location ID is required' 
-      });
-    }
+    const products = db.prepare('SELECT * FROM products').all();
+    const syncResults = [];
 
-    const token = cloverTokens[session_id];
-
-    // Get products with Clover IDs
-    const products = db.prepare(`
-      SELECT 
-        products.*,
-        inventory.quantity
-      FROM products
-      JOIN inventory ON products.id = inventory.product_id
-      WHERE inventory.location_id = ? AND products.clover_id IS NOT NULL
-    `).all(location_id);
-
-    let exported = 0;
-    let failed = 0;
-
-    // Update inventory in Clover
     for (const product of products) {
       try {
-        await cloverService.updateItemInventory(
-          token.accessToken,
-          token.merchantId,
-          product.clover_id,
-          product.quantity
-        );
-        exported++;
+        const cloverProduct = cloverService.mapToCloverItem(product);
+        
+        let result;
+        if (product.clover_id) {
+          // Update existing
+          result = await cloverService.updateItem(
+            user.clover_access_token,
+            user.clover_merchant_id,
+            product.clover_id,
+            cloverProduct
+          );
+          console.log('📤 Updated product in Clover:', product.name);
+        } else {
+          // Create new
+          result = await cloverService.createItem(
+            user.clover_access_token,
+            user.clover_merchant_id,
+            cloverProduct
+          );
+          console.log('📤 Created product in Clover:', product.name);
+          
+          // Store Clover ID
+          db.prepare('UPDATE products SET clover_id = ? WHERE id = ?')
+            .run(result.id, product.id);
+        }
+
+        syncResults.push({
+          productId: product.id,
+          name: product.name,
+          clover_id: result.id,
+          status: 'success'
+        });
       } catch (err) {
-        console.error(`Failed to export inventory for ${product.id}:`, err);
-        failed++;
+        syncResults.push({
+          productId: product.id,
+          name: product.name,
+          status: 'failed',
+          error: err.message
+        });
       }
     }
 
-    // Clean up session
-    delete cloverTokens[session_id];
+    db.close();
 
     res.json({
       success: true,
-      message: `Export complete: ${exported} exported, ${failed} failed`,
-      stats: {
-        exported,
-        failed,
-        total: products.length
-      }
+      message: `Synced ${syncResults.filter(r => r.status === 'success').length}/${products.length} products`,
+      results: syncResults
     });
+
   } catch (err) {
-    console.error('Export inventory error:', err);
+    console.error('❌ Sync products error:', err);
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to export inventory to Clover' 
+      message: 'Failed to sync products' 
     });
   }
 });
 
-// Manual sync
-router.post('/manual-sync', authMiddleware, managerOrAdmin, async (req, res) => {
+// POST /api/clover/sync-inventory - Sync inventory to Clover
+router.post('/sync-inventory', authMiddleware, async (req, res) => {
   try {
-    const { session_id, direction, location_id } = req.body;
+    const db = new Database(dbPath);
+    const user = db.prepare(
+      'SELECT clover_merchant_id, clover_access_token FROM users WHERE id = ?'
+    ).get(req.user.id);
 
-    if (!session_id || !cloverTokens[session_id]) {
+    if (!user || !user.clover_access_token || !user.clover_merchant_id) {
+      db.close();
       return res.status(400).json({ 
         success: false, 
-        message: 'Invalid session' 
+        message: 'Clover account not connected' 
       });
     }
 
-    if (!['import', 'export', 'bidirectional'].includes(direction)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid sync direction' 
-      });
+    const inventory = db.prepare(`
+      SELECT i.*, p.clover_id, p.name
+      FROM inventory i
+      JOIN products p ON i.product_id = p.id
+      WHERE p.clover_id IS NOT NULL
+    `).all();
+
+    const syncResults = [];
+    for (const item of inventory) {
+      try {
+        await cloverService.updateItemInventory(
+          user.clover_access_token,
+          user.clover_merchant_id,
+          item.clover_id,
+          item.quantity
+        );
+        
+        console.log('📊 Synced inventory:', item.name, 'qty:', item.quantity);
+        syncResults.push({
+          inventoryId: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          status: 'success'
+        });
+      } catch (err) {
+        syncResults.push({
+          inventoryId: item.id,
+          name: item.name,
+          status: 'failed',
+          error: err.message
+        });
+      }
     }
 
-    // For this demo, we'll just return success
-    // In production, you'd implement full sync logic here
+    db.close();
 
     res.json({
       success: true,
-      message: `Sync ${direction} completed successfully`,
-      sync_status: 'completed',
-      timestamp: new Date()
+      message: `Synced ${syncResults.filter(r => r.status === 'success').length}/${inventory.length} inventory items`,
+      results: syncResults
     });
+
   } catch (err) {
-    console.error('Manual sync error:', err);
+    console.error('❌ Sync inventory error:', err);
     res.status(500).json({ 
       success: false, 
-      message: 'Sync failed' 
+      message: 'Failed to sync inventory' 
     });
   }
 });
 
-// Check sync status
-router.get('/sync-status', authMiddleware, (req, res) => {
+// POST /api/clover/disconnect - Disconnect Clover
+router.post('/disconnect', authMiddleware, (req, res) => {
   try {
+    const db = new Database(dbPath);
+    db.prepare(`
+      UPDATE users 
+      SET clover_merchant_id = NULL, clover_access_token = NULL, clover_connected_at = NULL
+      WHERE id = ?
+    `).run(req.user.id);
+    db.close();
+
     res.json({
       success: true,
-      status: 'active',
-      last_sync: new Date(Date.now() - 3600000), // 1 hour ago
-      next_scheduled_sync: new Date(Date.now() + 3600000), // 1 hour from now
-      sync_interval: 3600 // seconds
+      message: 'Clover account disconnected'
     });
+
   } catch (err) {
-    console.error('Check sync status error:', err);
+    console.error('❌ Disconnect error:', err);
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to check sync status' 
+      message: 'Failed to disconnect Clover account' 
     });
   }
 });

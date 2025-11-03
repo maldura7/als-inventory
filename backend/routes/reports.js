@@ -1,14 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { db } = require('../database/init-database');
-const { authMiddleware } = require('../middleware/auth');
+const Database = require('better-sqlite3');
+const path = require('path');
+const authMiddleware = require('../middleware/auth');
+
+const dbPath = path.join(__dirname, '../database/inventory.db');
 
 // Inventory valuation report
 router.get('/inventory-value', authMiddleware, (req, res) => {
   try {
+    const db = new Database(dbPath);
     const { location_id, category } = req.query;
 
-    let whereClause = 'products.is_active = 1';
+    let whereClause = '1=1';
     const params = [];
 
     if (location_id) {
@@ -49,6 +53,8 @@ router.get('/inventory-value', authMiddleware, (req, res) => {
       WHERE ${whereClause}
     `).get(...params);
 
+    db.close();
+
     res.json({
       success: true,
       report,
@@ -66,6 +72,7 @@ router.get('/inventory-value', authMiddleware, (req, res) => {
 // Low stock report
 router.get('/low-stock', authMiddleware, (req, res) => {
   try {
+    const db = new Database(dbPath);
     const { location_id } = req.query;
 
     let query = `
@@ -83,7 +90,6 @@ router.get('/low-stock', authMiddleware, (req, res) => {
       JOIN products ON inventory.product_id = products.id
       JOIN locations ON inventory.location_id = locations.id
       WHERE inventory.quantity <= products.reorder_point
-      AND products.is_active = 1
     `;
 
     let params = [];
@@ -96,6 +102,7 @@ router.get('/low-stock', authMiddleware, (req, res) => {
     query += ' ORDER BY shortage DESC';
 
     const report = db.prepare(query).all(...params);
+    db.close();
 
     res.json({
       success: true,
@@ -111,88 +118,13 @@ router.get('/low-stock', authMiddleware, (req, res) => {
   }
 });
 
-// Stock movements report
-router.get('/stock-movements', authMiddleware, (req, res) => {
-  try {
-    const { location_id, product_id, movement_type, start_date, end_date } = req.query;
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, parseInt(req.query.limit) || 50);
-    const offset = (page - 1) * limit;
-
-    let whereClause = '1=1';
-    const params = [];
-
-    if (location_id) {
-      whereClause += ' AND stock_movements.location_id = ?';
-      params.push(location_id);
-    }
-
-    if (product_id) {
-      whereClause += ' AND stock_movements.product_id = ?';
-      params.push(product_id);
-    }
-
-    if (movement_type) {
-      whereClause += ' AND stock_movements.movement_type = ?';
-      params.push(movement_type);
-    }
-
-    if (start_date) {
-      whereClause += ' AND stock_movements.created_at >= ?';
-      params.push(start_date);
-    }
-
-    if (end_date) {
-      whereClause += ' AND stock_movements.created_at <= ?';
-      params.push(end_date);
-    }
-
-    const movements = db.prepare(`
-      SELECT 
-        stock_movements.*,
-        products.sku,
-        products.name,
-        locations.name as location_name,
-        users.full_name as user_name
-      FROM stock_movements
-      JOIN products ON stock_movements.product_id = products.id
-      JOIN locations ON stock_movements.location_id = locations.id
-      LEFT JOIN users ON stock_movements.user_id = users.id
-      WHERE ${whereClause}
-      ORDER BY stock_movements.created_at DESC
-      LIMIT ? OFFSET ?
-    `).all(...params, limit, offset);
-
-    const total = db.prepare(`
-      SELECT COUNT(*) as count FROM stock_movements
-      WHERE ${whereClause}
-    `).get(...params).count;
-
-    res.json({
-      success: true,
-      data: movements,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (err) {
-    console.error('Stock movements report error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to generate stock movements report' 
-    });
-  }
-});
-
 // ABC Analysis report
 router.get('/abc-analysis', authMiddleware, (req, res) => {
   try {
+    const db = new Database(dbPath);
     const { location_id } = req.query;
 
-    let whereClause = 'products.is_active = 1';
+    let whereClause = '1=1';
     const params = [];
 
     if (location_id) {
@@ -215,13 +147,15 @@ router.get('/abc-analysis', authMiddleware, (req, res) => {
       ORDER BY item_value DESC
     `).all(...params);
 
+    db.close();
+
     // Calculate total value
-    const totalValue = allItems.reduce((sum, item) => sum + item.item_value, 0);
+    const totalValue = allItems.reduce((sum, item) => sum + (item.item_value || 0), 0);
 
     // Classify items into A, B, C
     let cumulativeValue = 0;
     const report = allItems.map(item => {
-      cumulativeValue += item.item_value;
+      cumulativeValue += item.item_value || 0;
       const percentage = (cumulativeValue / totalValue) * 100;
       
       let classification = 'C';
@@ -257,61 +191,11 @@ router.get('/abc-analysis', authMiddleware, (req, res) => {
   }
 });
 
-// Stock turnover report
-router.get('/turnover', authMiddleware, (req, res) => {
-  try {
-    const { location_id, days = 90 } = req.query;
-
-    let whereClause = 'products.is_active = 1';
-    let dateClause = `stock_movements.created_at >= datetime('now', '-${days} days')`;
-    const params = [];
-
-    if (location_id) {
-      whereClause += ' AND inventory.location_id = ?';
-      params.push(location_id);
-    }
-
-    const report = db.prepare(`
-      SELECT 
-        products.id,
-        products.sku,
-        products.name,
-        products.category,
-        SUM(CASE WHEN stock_movements.movement_type IN ('sale', 'transfer') AND stock_movements.quantity < 0 
-                 THEN ABS(stock_movements.quantity) ELSE 0 END) as quantity_sold,
-        AVG(inventory.quantity) as avg_quantity,
-        CASE 
-          WHEN AVG(inventory.quantity) > 0 
-          THEN ROUND(SUM(CASE WHEN stock_movements.movement_type IN ('sale', 'transfer') AND stock_movements.quantity < 0 
-                         THEN ABS(stock_movements.quantity) ELSE 0 END) / AVG(inventory.quantity), 2)
-          ELSE 0 
-        END as turnover_ratio
-      FROM inventory
-      JOIN products ON inventory.product_id = products.id
-      LEFT JOIN stock_movements ON products.id = stock_movements.product_id 
-        AND ${dateClause}
-      WHERE ${whereClause}
-      GROUP BY products.id
-      ORDER BY turnover_ratio DESC
-    `).all(...params);
-
-    res.json({
-      success: true,
-      report,
-      period_days: parseInt(days)
-    });
-  } catch (err) {
-    console.error('Turnover report error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to generate turnover report' 
-    });
-  }
-});
-
 // Location inventory summary
 router.get('/location-summary', authMiddleware, (req, res) => {
   try {
+    const db = new Database(dbPath);
+    
     const summary = db.prepare(`
       SELECT 
         locations.id,
@@ -323,10 +207,11 @@ router.get('/location-summary', authMiddleware, (req, res) => {
       FROM locations
       LEFT JOIN inventory ON locations.id = inventory.location_id
       LEFT JOIN products ON inventory.product_id = products.id
-      WHERE locations.is_active = 1
       GROUP BY locations.id
       ORDER BY locations.name
     `).all();
+
+    db.close();
 
     res.json({
       success: true,

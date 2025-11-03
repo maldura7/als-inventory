@@ -1,52 +1,41 @@
 const jwt = require('jsonwebtoken');
+const Database = require('better-sqlite3');
+const path = require('path');
 
-// Verify JWT token middleware
+const dbPath = path.join(__dirname, '../database/inventory.db');
+
 const authMiddleware = (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
-    
+
     if (!token) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'No token provided' 
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided'
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const db = new Database(dbPath);
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId);
+    db.close();
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    req.user = user;
     next();
   } catch (err) {
-    return res.status(401).json({ 
-      success: false, 
-      message: 'Invalid or expired token' 
+    console.error('Auth error:', err);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
     });
   }
 };
 
-// Check if user is admin
-const adminOnly = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Admin access required' 
-    });
-  }
-  next();
-};
-
-// Check if user is manager or admin
-const managerOrAdmin = (req, res, next) => {
-  if (!['admin', 'manager'].includes(req.user.role)) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Manager or admin access required' 
-    });
-  }
-  next();
-};
-
-module.exports = {
-  authMiddleware,
-  adminOnly,
-  managerOrAdmin
-};
+module.exports = authMiddleware;
