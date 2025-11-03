@@ -14,7 +14,7 @@ if (!fs.existsSync(dbPath)) {
   console.log('✅ Database initialized');
 }
 
-// Seed admin account if it doesn't exist
+// Seed admin account with default location if they don't exist
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
@@ -24,24 +24,45 @@ try {
   const adminExists = db.prepare('SELECT id FROM users WHERE role = ?').get('admin');
   
   if (!adminExists) {
-    console.log('Creating admin account...');
+    console.log('Creating default location and admin account...');
+    
+    const locationId = uuidv4();
     const userId = uuidv4();
     const hashedPassword = bcrypt.hashSync('Admin123456', 10);
     
+    // Create default location first
     db.prepare(`
-      INSERT INTO users (id, email, password, full_name, role, is_active, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO locations (id, name, address, city, state, zip, is_active, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      locationId,
+      'Headquarters',
+      '1701 Joe Harvey',
+      'HOBBS',
+      'NEW MEXICO',
+      '88240',
+      1,
+      new Date().toISOString()
+    );
+    
+    console.log('✅ Default location created');
+    
+    // Create admin account with location_id
+    db.prepare(`
+      INSERT INTO users (id, email, password, full_name, role, location_id, is_active, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       userId,
       'admin@example.com',
       hashedPassword,
       'Administrator',
       'admin',
+      locationId,
       1,
       new Date().toISOString()
     );
     
-    console.log('✅ Admin account created');
+    console.log('✅ Admin account created with location_id');
   }
   db.close();
 } catch (err) {
