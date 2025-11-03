@@ -19,9 +19,9 @@ const Users = () => {
     location_id: ''
   });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+useEffect(() => {
+  fetchData();
+}, [fetchData]);  // ✅ Add fetchData
 
   const fetchData = async () => {
     try {

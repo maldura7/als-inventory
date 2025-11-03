@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+///import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 
@@ -14,9 +14,9 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchData();
-  }, [user.location_id, user.id]);
+useEffect(() => {
+  fetchData();
+}, [fetchData]);
 
   const fetchData = async () => {
     try {
